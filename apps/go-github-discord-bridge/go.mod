@@ -3,13 +3,13 @@ module dizzycode1112/github-discord-bridge
 go 1.25.1
 
 require (
-	dizzy/logger v0.0.0
+	dizzycoder1112/logger v0.0.0
 	github.com/gin-gonic/gin v1.11.0
 	github.com/joho/godotenv v1.5.1
 	github.com/redis/go-redis/v9 v9.17.3
 )
 
-replace dizzy/logger => ../../go-packages/logger
+replace dizzycoder1112/logger => ../../go-packages/logger
 
 require (
 	github.com/bytedance/sonic v1.14.0 // indirect

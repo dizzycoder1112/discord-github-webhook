@@ -1,8 +1,8 @@
 package applogger
 
 import (
-	"dizzy/logger"
-	"dizzy/logger/strategies"
+	"dizzycoder1112/logger"
+	"dizzycoder1112/logger/strategies"
 )
 
 var Log logger.Logger
