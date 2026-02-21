@@ -24,7 +24,7 @@ on:
         type: boolean
         default: false
     secrets:
-      DO_GITHUB_ACTION_K8S_ACCESS_TOKEN:
+      DO_GITHUB_ACCESS_TOKEN:
         required: true
 
 jobs:

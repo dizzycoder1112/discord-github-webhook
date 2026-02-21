@@ -27,7 +27,7 @@ on:
         type: boolean
         default: false
     secrets:
-      DO_IMAGE_REGISTRY_TOKEN:
+      DO_GITHUB_ACCESS_TOKEN:
         required: true
 
 jobs:
