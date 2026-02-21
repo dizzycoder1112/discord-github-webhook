@@ -266,8 +266,19 @@ func FormatWorkflowRunResult(wr *github.WorkflowRun) ThreadMessage {
 }
 
 // FormatThreadTitle 格式化 thread 標題（限制 100 字元）
-func FormatThreadTitle(prNumber int, prTitle string) string {
-	title := fmt.Sprintf("PR #%d: %s", prNumber, prTitle)
+// repoFullName 格式為 "owner/repo"，只取 repo 名稱作為前綴
+func FormatThreadTitle(prNumber int, prTitle string, repoFullName string) string {
+	repoName := repoFullName
+	if idx := len(repoFullName) - 1; idx >= 0 {
+		for i := idx; i >= 0; i-- {
+			if repoFullName[i] == '/' {
+				repoName = repoFullName[i+1:]
+				break
+			}
+		}
+	}
+
+	title := fmt.Sprintf("[%s] PR #%d: %s", repoName, prNumber, prTitle)
 
 	// Discord forum thread title 限制 100 字元
 	if len(title) > 100 {

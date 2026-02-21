@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 
 	"dizzycode1112/github-discord-bridge/internal/config"
 	"dizzycode1112/github-discord-bridge/internal/discord"
@@ -144,22 +145,24 @@ func (app *App) handleEvent(ghEvent string, payload *github.WebhookPayload) erro
 		return fmt.Errorf("failed to get PR identifier")
 	}
 
+	repoFullName := payload.Repository.FullName
+
 	switch ghEvent {
 	case "pull_request":
 		switch payload.Action {
 		case "opened":
-			return app.handlePROpened(prID, pr)
+			return app.handlePROpened(prID, pr, repoFullName)
 		case "synchronize":
-			return app.handlePRUpdated(prID, pr)
+			return app.handlePRUpdated(prID, pr, repoFullName)
 		case "closed":
 			if pr.Merged {
-				return app.handlePRMerged(prID, pr, payload.Sender.Login)
+				return app.handlePRMerged(prID, pr, payload.Sender.Login, repoFullName)
 			}
-			return app.handlePRClosed(prID, pr, payload.Sender.Login)
+			return app.handlePRClosed(prID, pr, payload.Sender.Login, repoFullName)
 		case "reopened":
-			return app.handlePRReopened(prID, pr)
+			return app.handlePRReopened(prID, pr, repoFullName)
 		case "review_requested":
-			return app.handleReviewRequested(prID, pr, payload.RequestedReviewer, payload.Sender.Login)
+			return app.handleReviewRequested(prID, pr, payload.RequestedReviewer, payload.Sender.Login, repoFullName)
 		case "review_request_removed", "edited", "labeled", "unlabeled", "assigned", "unassigned":
 			return nil
 		default:
@@ -171,7 +174,7 @@ func (app *App) handleEvent(ghEvent string, payload *github.WebhookPayload) erro
 			log.Info("Ignoring pull_request_review action", "action", payload.Action)
 			return nil
 		}
-		return app.handlePRReviewed(prID, pr, payload.Review)
+		return app.handlePRReviewed(prID, pr, payload.Review, repoFullName)
 	case "issue_comment", "pull_request_review_comment":
 		log.Info("Ignoring comment event", "ghEvent", ghEvent)
 		return nil
@@ -181,7 +184,7 @@ func (app *App) handleEvent(ghEvent string, payload *github.WebhookPayload) erro
 	}
 }
 
-func (app *App) handlePROpened(prID string, pr *github.PullRequest) error {
+func (app *App) handlePROpened(prID string, pr *github.PullRequest, repoFullName string) error {
 	log := applogger.Log
 
 	if existingThreadID, exists, _ := app.store.Get(prID); exists {
@@ -189,10 +192,23 @@ func (app *App) handlePROpened(prID string, pr *github.PullRequest) error {
 		return nil
 	}
 
-	title := discord.FormatThreadTitle(pr.Number, pr.Title)
+	title := discord.FormatThreadTitle(pr.Number, pr.Title, repoFullName)
 	message := discord.FormatPROpened(pr)
 
-	threadID, err := app.discordClient.CreateThread(title, message)
+	// 取得或建立 repo 對應的 forum tag
+	repoName := repoFullName
+	if idx := strings.LastIndex(repoFullName, "/"); idx >= 0 {
+		repoName = repoFullName[idx+1:]
+	}
+
+	var tagIDs []string
+	if tagID, err := app.discordClient.GetOrCreateRepoTag(repoName); err != nil {
+		log.Warn("Failed to get/create repo tag, creating thread without tag", "repo", repoName, "error", err)
+	} else {
+		tagIDs = append(tagIDs, tagID)
+	}
+
+	threadID, err := app.discordClient.CreateThread(title, message, tagIDs...)
 	if err != nil {
 		return fmt.Errorf("failed to create thread: %w", err)
 	}
@@ -205,7 +221,7 @@ func (app *App) handlePROpened(prID string, pr *github.PullRequest) error {
 	return nil
 }
 
-func (app *App) handlePRUpdated(prID string, pr *github.PullRequest) error {
+func (app *App) handlePRUpdated(prID string, pr *github.PullRequest, repoFullName string) error {
 	log := applogger.Log
 
 	threadID, exists, err := app.store.Get(prID)
@@ -215,7 +231,7 @@ func (app *App) handlePRUpdated(prID string, pr *github.PullRequest) error {
 
 	if !exists {
 		log.Info("Thread not found, auto-creating", "prID", prID)
-		if err := app.handlePROpened(prID, pr); err != nil {
+		if err := app.handlePROpened(prID, pr, repoFullName); err != nil {
 			return fmt.Errorf("failed to auto-create thread: %w", err)
 		}
 		threadID, exists, err = app.store.Get(prID)
@@ -228,7 +244,7 @@ func (app *App) handlePRUpdated(prID string, pr *github.PullRequest) error {
 	return app.discordClient.PostMessage(threadID, message)
 }
 
-func (app *App) handleReviewRequested(prID string, pr *github.PullRequest, reviewer *github.User, requestedBy string) error {
+func (app *App) handleReviewRequested(prID string, pr *github.PullRequest, reviewer *github.User, requestedBy string, repoFullName string) error {
 	log := applogger.Log
 
 	if reviewer == nil {
@@ -243,7 +259,7 @@ func (app *App) handleReviewRequested(prID string, pr *github.PullRequest, revie
 
 	if !exists {
 		log.Info("Thread not found, auto-creating", "prID", prID)
-		if err := app.handlePROpened(prID, pr); err != nil {
+		if err := app.handlePROpened(prID, pr, repoFullName); err != nil {
 			return fmt.Errorf("failed to auto-create thread: %w", err)
 		}
 		threadID, exists, err = app.store.Get(prID)
@@ -256,7 +272,7 @@ func (app *App) handleReviewRequested(prID string, pr *github.PullRequest, revie
 	return app.discordClient.PostMessage(threadID, message)
 }
 
-func (app *App) handlePRReviewed(prID string, pr *github.PullRequest, review *github.Review) error {
+func (app *App) handlePRReviewed(prID string, pr *github.PullRequest, review *github.Review, repoFullName string) error {
 	log := applogger.Log
 
 	threadID, exists, err := app.store.Get(prID)
@@ -266,7 +282,7 @@ func (app *App) handlePRReviewed(prID string, pr *github.PullRequest, review *gi
 
 	if !exists {
 		log.Info("Thread not found, auto-creating", "prID", prID)
-		if err := app.handlePROpened(prID, pr); err != nil {
+		if err := app.handlePROpened(prID, pr, repoFullName); err != nil {
 			return fmt.Errorf("failed to auto-create thread: %w", err)
 		}
 		threadID, exists, err = app.store.Get(prID)
@@ -279,7 +295,7 @@ func (app *App) handlePRReviewed(prID string, pr *github.PullRequest, review *gi
 	return app.discordClient.PostMessage(threadID, message)
 }
 
-func (app *App) handlePRMerged(prID string, pr *github.PullRequest, mergedBy string) error {
+func (app *App) handlePRMerged(prID string, pr *github.PullRequest, mergedBy string, repoFullName string) error {
 	log := applogger.Log
 
 	threadID, exists, err := app.store.Get(prID)
@@ -289,7 +305,7 @@ func (app *App) handlePRMerged(prID string, pr *github.PullRequest, mergedBy str
 
 	if !exists {
 		log.Info("Thread not found, auto-creating before merge notification", "prID", prID)
-		if err := app.handlePROpened(prID, pr); err != nil {
+		if err := app.handlePROpened(prID, pr, repoFullName); err != nil {
 			return fmt.Errorf("failed to auto-create thread: %w", err)
 		}
 		threadID, exists, err = app.store.Get(prID)
@@ -315,7 +331,7 @@ func (app *App) handlePRMerged(prID string, pr *github.PullRequest, mergedBy str
 	return nil
 }
 
-func (app *App) handlePRClosed(prID string, pr *github.PullRequest, closedBy string) error {
+func (app *App) handlePRClosed(prID string, pr *github.PullRequest, closedBy string, repoFullName string) error {
 	log := applogger.Log
 
 	threadID, exists, err := app.store.Get(prID)
@@ -325,7 +341,7 @@ func (app *App) handlePRClosed(prID string, pr *github.PullRequest, closedBy str
 
 	if !exists {
 		log.Info("Thread not found, auto-creating before close notification", "prID", prID)
-		if err := app.handlePROpened(prID, pr); err != nil {
+		if err := app.handlePROpened(prID, pr, repoFullName); err != nil {
 			return fmt.Errorf("failed to auto-create thread: %w", err)
 		}
 		threadID, exists, err = app.store.Get(prID)
@@ -351,14 +367,14 @@ func (app *App) handlePRClosed(prID string, pr *github.PullRequest, closedBy str
 	return nil
 }
 
-func (app *App) handlePRReopened(prID string, pr *github.PullRequest) error {
+func (app *App) handlePRReopened(prID string, pr *github.PullRequest, repoFullName string) error {
 	threadID, exists, err := app.store.Get(prID)
 	if err != nil {
 		return err
 	}
 
 	if !exists {
-		return app.handlePROpened(prID, pr)
+		return app.handlePROpened(prID, pr, repoFullName)
 	}
 
 	message := discord.ThreadMessage{

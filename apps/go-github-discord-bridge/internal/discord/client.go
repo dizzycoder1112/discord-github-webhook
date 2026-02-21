@@ -32,9 +32,9 @@ func NewClient(token, forumChannelID string) *Client {
 
 // CreateThreadRequest 建立 thread 的請求結構
 type CreateThreadRequest struct {
-	Name    string        `json:"name"`    // Thread 標題
-	Message ThreadMessage `json:"message"` // 第一則訊息
-	// AppliedTags []string `json:"applied_tags,omitempty"` // Forum tags (可選)
+	Name        string        `json:"name"`                    // Thread 標題
+	Message     ThreadMessage `json:"message"`                 // 第一則訊息
+	AppliedTags []string      `json:"applied_tags,omitempty"`  // Forum tags (可選)
 }
 
 type ThreadMessage struct {
@@ -70,13 +70,104 @@ type CreateThreadResponse struct {
 	Name string `json:"name"` // Thread 名稱
 }
 
+// ForumTag Discord forum channel 的 tag 結構
+type ForumTag struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// ForumChannelResponse Discord channel 資訊（用於取得 available_tags）
+type ForumChannelResponse struct {
+	AvailableTags []ForumTag `json:"available_tags"`
+}
+
+// GetOrCreateRepoTag 取得或建立 repo 對應的 forum tag，回傳 tag ID
+// 如果 forum 已有同名 tag 就直接用，沒有就建立新的
+func (c *Client) GetOrCreateRepoTag(repoName string) (string, error) {
+	// 取得 forum channel 資訊
+	url := fmt.Sprintf("%s/channels/%s", DiscordAPIBase, c.forumChannelID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bot "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to get channel: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("discord API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var channel ForumChannelResponse
+	if err := json.Unmarshal(body, &channel); err != nil {
+		return "", fmt.Errorf("failed to parse channel: %w", err)
+	}
+
+	// 找已存在的 tag
+	for _, tag := range channel.AvailableTags {
+		if tag.Name == repoName {
+			return tag.ID, nil
+		}
+	}
+
+	// 建立新 tag（透過 PATCH channel，加入新的 available_tags）
+	newTags := append(channel.AvailableTags, ForumTag{Name: repoName})
+
+	type PatchBody struct {
+		AvailableTags []ForumTag `json:"available_tags"`
+	}
+	patchData, err := json.Marshal(PatchBody{AvailableTags: newTags})
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal patch: %w", err)
+	}
+
+	patchReq, err := http.NewRequest("PATCH", url, bytes.NewBuffer(patchData))
+	if err != nil {
+		return "", fmt.Errorf("failed to create patch request: %w", err)
+	}
+	patchReq.Header.Set("Authorization", "Bot "+c.token)
+	patchReq.Header.Set("Content-Type", "application/json")
+
+	patchResp, err := c.httpClient.Do(patchReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to patch channel: %w", err)
+	}
+	defer patchResp.Body.Close()
+
+	patchBody, _ := io.ReadAll(patchResp.Body)
+	if patchResp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("discord API error on patch (status %d): %s", patchResp.StatusCode, string(patchBody))
+	}
+
+	// 重新解析拿到新 tag 的 ID
+	var updated ForumChannelResponse
+	if err := json.Unmarshal(patchBody, &updated); err != nil {
+		return "", fmt.Errorf("failed to parse updated channel: %w", err)
+	}
+
+	for _, tag := range updated.AvailableTags {
+		if tag.Name == repoName {
+			return tag.ID, nil
+		}
+	}
+
+	return "", fmt.Errorf("tag created but not found in response")
+}
+
 // CreateThread 在 forum channel 建立新的 thread
-func (c *Client) CreateThread(title string, message ThreadMessage) (string, error) {
+func (c *Client) CreateThread(title string, message ThreadMessage, tagIDs ...string) (string, error) {
 	url := fmt.Sprintf("%s/channels/%s/threads", DiscordAPIBase, c.forumChannelID)
 
 	reqBody := CreateThreadRequest{
-		Name:    title,
-		Message: message,
+		Name:        title,
+		Message:     message,
+		AppliedTags: tagIDs,
 	}
 
 	jsonData, err := json.Marshal(reqBody)
