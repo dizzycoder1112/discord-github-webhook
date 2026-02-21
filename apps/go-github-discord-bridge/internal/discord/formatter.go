@@ -60,7 +60,8 @@ func FormatPROpened(pr *github.PullRequest) ThreadMessage {
 }
 
 // FormatPRReview 格式化「PR Review」的訊息
-func FormatPRReview(review *github.Review, prNumber int, prURL string) ThreadMessage {
+// prAuthorLogin: PR 作者的 GitHub 帳號，用來查 userMap 取得 Discord ID 做 mention
+func FormatPRReview(review *github.Review, prNumber int, prURL string, prAuthorLogin string, userMap map[string]string) ThreadMessage {
 	var emoji string
 	var color int
 
@@ -98,8 +99,19 @@ func FormatPRReview(review *github.Review, prNumber int, prURL string) ThreadMes
 		Timestamp:   review.SubmittedAt.Format(time.RFC3339),
 	}
 
+	// 只有 approved / changes_requested 才 mention PR 作者（commented 不打擾）
+	var content string
+	if review.State == "approved" || review.State == "changes_requested" {
+		if discordID, ok := userMap[prAuthorLogin]; ok {
+			content = fmt.Sprintf("<@%s>", discordID)
+		} else {
+			content = fmt.Sprintf("@%s", prAuthorLogin)
+		}
+	}
+
 	return ThreadMessage{
-		Embeds: []Embed{embed},
+		Content: content,
+		Embeds:  []Embed{embed},
 	}
 }
 

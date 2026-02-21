@@ -275,7 +275,7 @@ func (app *App) handlePRReviewed(prID string, pr *github.PullRequest, review *gi
 		}
 	}
 
-	message := discord.FormatPRReview(review, pr.Number, pr.HTMLURL)
+	message := discord.FormatPRReview(review, pr.Number, pr.HTMLURL, pr.User.Login, config.AppConfig.GitHubDiscordUserMap)
 	return app.discordClient.PostMessage(threadID, message)
 }
 
