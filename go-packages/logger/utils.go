@@ -28,7 +28,12 @@ func ParseContext(context []any) map[string]any {
 			continue
 		}
 
-		result[key] = context[i+1]
+		// Convert error to string so JSON serialization preserves the message
+		if err, ok := context[i+1].(error); ok {
+			result[key] = err.Error()
+		} else {
+			result[key] = context[i+1]
+		}
 	}
 
 	return result
