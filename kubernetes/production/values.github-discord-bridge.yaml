@@ -5,8 +5,11 @@ containers:
   image:
     repository: registry.digitalocean.com/dizzycoder1112/github-discord-bridge
     pullPolicy: Always
-    tag: '.dev'
-  env: []
+  env:
+    - name: PORT
+      value: '3000'
+    - name: ENV
+      value: 'development'
   secretsFrom: github-discord-bridge-secrets
 
 imagePullSecrets:
