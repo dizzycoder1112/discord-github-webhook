@@ -1,0 +1,35 @@
+replicaCount: 1
+app: github-discord-bridge
+containers:
+  port: 3000
+  image:
+    repository: registry.digitalocean.com/dizzycoder1112/github-discord-bridge
+    pullPolicy: Always
+  env:
+    - name: PORT
+      value: '3000'
+    - name: ENV
+      value: 'development'
+  secretsFrom: github-discord-bridge-secrets
+
+imagePullSecrets:
+  - name: do-registry-secret
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 64Mi
+
+service:
+  enabled: true
+  protocol: TCP
+  type: ClusterIP
+
+ingress:
+  enabled: true
+  host: github-discord-bridge.dizzycode.xyz
+
+env: {}

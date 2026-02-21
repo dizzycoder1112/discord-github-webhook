@@ -1,0 +1,7 @@
+services:
+  github-discord-bridge:
+    image: github-discord-bridge
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: ./apps/go-github-discord-bridge/Dockerfile

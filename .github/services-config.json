@@ -1,8 +1,8 @@
 {
   "services": [
     {
-      "name": "app",
-      "path": "apps/project-app"
+      "name": "github-discord-bridge",
+      "path": "apps/go-github-discord-bridge"
     }
   ],
   "environments": {
@@ -15,7 +15,7 @@
       "tag_suffix": ".staging"
     },
     "production": {
-      "namespace": "project",
+      "namespace": "webhook",
       "tag_suffix": ""
     }
   },

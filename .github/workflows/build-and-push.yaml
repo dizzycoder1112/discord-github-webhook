@@ -63,9 +63,9 @@ jobs:
       - name: Tag Docker Image
         if: ${{ success() }}
         run: |
-          docker tag ${{ inputs.serviceName }} registry.digitalocean.com/dizzycode1112/${{ inputs.image }}:${{ inputs.tag }}
+          docker tag ${{ inputs.serviceName }} registry.digitalocean.com/dizzycoder1112/${{ inputs.image }}:${{ inputs.tag }}
 
       - name: Push Docker Image
         if: ${{ success() }}
         run: |
-          docker push registry.digitalocean.com/dizzycode1112/${{ inputs.image }}:${{ inputs.tag }}
+          docker push registry.digitalocean.com/dizzycoder1112/${{ inputs.image }}:${{ inputs.tag }}

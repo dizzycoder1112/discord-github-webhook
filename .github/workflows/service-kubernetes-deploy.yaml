@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !inputs.skip }}
     env:
-      CLUSTER_NAME: k8s-dizzycode1112-do-sgp
+      CLUSTER_NAME: k8s-polycoin-do-sgp
     steps:
       - uses: actions/checkout@v4
       - name: Inputs Validation
