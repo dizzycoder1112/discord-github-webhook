@@ -99,13 +99,14 @@ func FormatPRReview(review *github.Review, prNumber int, prURL string, prAuthorL
 		Timestamp:   review.SubmittedAt.Format(time.RFC3339),
 	}
 
-	// 只有 approved / changes_requested 才 mention PR 作者（commented 不打擾）
+	// approved / changes_requested 才 mention PR 作者（commented 不打擾）
+	// 格式包含 review state 和 PR 資訊，方便 AI agent 解析後去 GitHub 查看
 	var content string
 	if review.State == "approved" || review.State == "changes_requested" {
 		if discordID, ok := userMap[prAuthorLogin]; ok {
-			content = fmt.Sprintf("<@%s>", discordID)
+			content = fmt.Sprintf("<@%s> %s PR #%d — %s", discordID, review.State, prNumber, prURL)
 		} else {
-			content = fmt.Sprintf("@%s", prAuthorLogin)
+			content = fmt.Sprintf("@%s %s PR #%d — %s", prAuthorLogin, review.State, prNumber, prURL)
 		}
 	}
 
