@@ -18,9 +18,9 @@ containers:
 imagePullSecrets:
   - name: docker-registry-secret
 
-infisical:
-  envSlug: dev
-  projectId: 'infisical-project-id'
+# infisical:
+#   envSlug: dev
+#   projectId: 'infisical-project-id'
 
 # nodeSelector:
 #   doks.digitalocean.com/node-pool: "pool-258gs845a" select the pool
