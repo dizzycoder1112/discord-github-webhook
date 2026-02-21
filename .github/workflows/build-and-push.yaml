@@ -27,7 +27,7 @@ on:
         type: boolean
         default: false
     secrets:
-      DO_GITHUB_ACCESS_TOKEN:
+      DO_IMAGE_REGISTRY_TOKEN:
         required: true
 
 jobs:
@@ -41,7 +41,7 @@ jobs:
         with:
           registry: registry.digitalocean.com
           username: champerwu.work@gmail.com
-          password: ${{ secrets.DO_GITHUB_ACCESS_TOKEN }}
+          password: ${{ secrets.DO_IMAGE_REGISTRY_TOKEN }}
 
       - name: Build Parameters Setup
         id: inputs
